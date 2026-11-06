@@ -1,0 +1,315 @@
+{
+  "_root_goal": "mine diamond",
+  "nodes": [
+    {
+      "name": "collect wood",
+      "description": "Face tree and use Do to obtain wood.",
+      "required_tools": [],
+      "required_materials": [],
+      "preconditions": [],
+      "postconditions": {
+        "wood": 1
+      },
+      "task_list": [
+        "Move toward tree",
+        "Do"
+      ]
+    },
+    {
+      "name": "mine stone",
+      "description": "Face stone and use Do to obtain stone.",
+      "required_tools": [
+        "wood_pickaxe"
+      ],
+      "required_materials": [],
+      "preconditions": [
+        "craft wooden pickaxe"
+      ],
+      "postconditions": {
+        "stone": 1
+      },
+      "task_list": [
+        "Move toward stone",
+        "Do"
+      ]
+    },
+    {
+      "name": "mine coal",
+      "description": "Face coal and use Do to obtain coal.",
+      "required_tools": [
+        "wood_pickaxe"
+      ],
+      "required_materials": [],
+      "preconditions": [
+        "craft wooden pickaxe"
+      ],
+      "postconditions": {
+        "coal": 1
+      },
+      "task_list": [
+        "Move toward coal",
+        "Do"
+      ]
+    },
+    {
+      "name": "mine iron",
+      "description": "Face iron and use Do to obtain iron.",
+      "required_tools": [
+        "stone_pickaxe"
+      ],
+      "required_materials": [],
+      "preconditions": [
+        "craft stone pickaxe"
+      ],
+      "postconditions": {
+        "iron": 1
+      },
+      "task_list": [
+        "Move toward iron",
+        "Do"
+      ]
+    },
+    {
+      "name": "mine diamond",
+      "description": "Face diamond and use Do to obtain diamond.",
+      "required_tools": [
+        "iron_pickaxe"
+      ],
+      "required_materials": [],
+      "preconditions": [
+        "craft iron pickaxe"
+      ],
+      "postconditions": {
+        "diamond": 1
+      },
+      "task_list": [
+        "Move toward diamond",
+        "Do"
+      ]
+    },
+    {
+      "name": "collect sapling",
+      "description": "Face grass and use Do to obtain sapling.",
+      "required_tools": [],
+      "required_materials": [],
+      "preconditions": [],
+      "postconditions": {
+        "sapling": 1
+      },
+      "task_list": [
+        "Move toward grass",
+        "Do"
+      ]
+    },
+    {
+      "name": "place crafting table",
+      "description": "Place a table, consuming wood.",
+      "required_tools": [],
+      "required_materials": {
+        "wood": 2
+      },
+      "preconditions": [
+        "collect wood"
+      ],
+      "postconditions": {
+        "nearby": "table"
+      },
+      "task_list": [
+        "Place Table"
+      ]
+    },
+    {
+      "name": "place furnace",
+      "description": "Place a furnace, consuming stone, coal.",
+      "required_tools": [],
+      "required_materials": {
+        "stone": 1,
+        "coal": 1
+      },
+      "preconditions": [
+        "mine stone",
+        "mine coal"
+      ],
+      "postconditions": {
+        "nearby": "furnace"
+      },
+      "task_list": [
+        "Place Furnace"
+      ]
+    },
+    {
+      "name": "craft wooden pickaxe",
+      "description": "Make a wood_pickaxe next to table.",
+      "required_tools": [
+        "table"
+      ],
+      "required_materials": {
+        "wood": 1,
+        "sapling": 1
+      },
+      "preconditions": [
+        "place crafting table",
+        "collect wood",
+        "collect sapling"
+      ],
+      "postconditions": {
+        "wood_pickaxe": 1
+      },
+      "task_list": [
+        "Make Wood Pickaxe"
+      ]
+    },
+    {
+      "name": "craft stone pickaxe",
+      "description": "Make a stone_pickaxe next to table.",
+      "required_tools": [
+        "table"
+      ],
+      "required_materials": {
+        "wood": 1,
+        "stone": 1,
+        "coal": 1
+      },
+      "preconditions": [
+        "place crafting table",
+        "collect wood",
+        "mine stone",
+        "mine coal"
+      ],
+      "postconditions": {
+        "stone_pickaxe": 1
+      },
+      "task_list": [
+        "Make Stone Pickaxe"
+      ]
+    },
+    {
+      "name": "craft iron pickaxe",
+      "description": "Make a iron_pickaxe next to furnace.",
+      "required_tools": [
+        "furnace"
+      ],
+      "required_materials": {
+        "wood": 1,
+        "coal": 1,
+        "iron": 1
+      },
+      "preconditions": [
+        "place furnace",
+        "collect wood",
+        "mine coal",
+        "mine iron"
+      ],
+      "postconditions": {
+        "iron_pickaxe": 1
+      },
+      "task_list": [
+        "Make Iron Pickaxe"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "mine stone",
+      "to": "craft wooden pickaxe",
+      "description": "'mine stone' needs wood_pickaxe, which 'craft wooden pickaxe' provides."
+    },
+    {
+      "from": "mine coal",
+      "to": "craft wooden pickaxe",
+      "description": "'mine coal' needs wood_pickaxe, which 'craft wooden pickaxe' provides."
+    },
+    {
+      "from": "mine iron",
+      "to": "craft stone pickaxe",
+      "description": "'mine iron' needs stone_pickaxe, which 'craft stone pickaxe' provides."
+    },
+    {
+      "from": "mine diamond",
+      "to": "craft iron pickaxe",
+      "description": "'mine diamond' needs iron_pickaxe, which 'craft iron pickaxe' provides."
+    },
+    {
+      "from": "place crafting table",
+      "to": "collect wood",
+      "description": "'place crafting table' needs wood, which 'collect wood' provides."
+    },
+    {
+      "from": "place furnace",
+      "to": "mine stone",
+      "description": "'place furnace' needs stone, which 'mine stone' provides."
+    },
+    {
+      "from": "place furnace",
+      "to": "mine coal",
+      "description": "'place furnace' needs coal, which 'mine coal' provides."
+    },
+    {
+      "from": "craft wooden pickaxe",
+      "to": "place crafting table",
+      "description": "'craft wooden pickaxe' needs table, which 'place crafting table' provides."
+    },
+    {
+      "from": "craft wooden pickaxe",
+      "to": "collect wood",
+      "description": "'craft wooden pickaxe' needs wood, which 'collect wood' provides."
+    },
+    {
+      "from": "craft wooden pickaxe",
+      "to": "collect sapling",
+      "description": "'craft wooden pickaxe' needs sapling, which 'collect sapling' provides."
+    },
+    {
+      "from": "craft stone pickaxe",
+      "to": "place crafting table",
+      "description": "'craft stone pickaxe' needs table, which 'place crafting table' provides."
+    },
+    {
+      "from": "craft stone pickaxe",
+      "to": "collect wood",
+      "description": "'craft stone pickaxe' needs wood, which 'collect wood' provides."
+    },
+    {
+      "from": "craft stone pickaxe",
+      "to": "mine stone",
+      "description": "'craft stone pickaxe' needs stone, which 'mine stone' provides."
+    },
+    {
+      "from": "craft stone pickaxe",
+      "to": "mine coal",
+      "description": "'craft stone pickaxe' needs coal, which 'mine coal' provides."
+    },
+    {
+      "from": "craft iron pickaxe",
+      "to": "place furnace",
+      "description": "'craft iron pickaxe' needs furnace, which 'place furnace' provides."
+    },
+    {
+      "from": "craft iron pickaxe",
+      "to": "collect wood",
+      "description": "'craft iron pickaxe' needs wood, which 'collect wood' provides."
+    },
+    {
+      "from": "craft iron pickaxe",
+      "to": "mine coal",
+      "description": "'craft iron pickaxe' needs coal, which 'mine coal' provides."
+    },
+    {
+      "from": "craft iron pickaxe",
+      "to": "mine iron",
+      "description": "'craft iron pickaxe' needs iron, which 'mine iron' provides."
+    }
+  ],
+  "_bill_of_materials": {
+    "iron_pickaxe": 1,
+    "wood": 5,
+    "coal": 3,
+    "iron": 1,
+    "furnace": 1,
+    "stone_pickaxe": 1,
+    "stone": 2,
+    "table": 1,
+    "wood_pickaxe": 1,
+    "sapling": 1
+  }
+}

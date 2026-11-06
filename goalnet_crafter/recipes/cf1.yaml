@@ -1,0 +1,12 @@
+description: >
+  Counterfactual recipes. Each change contradicts the usual Crafter/Minecraft
+  progression an LLM has seen in pre-training, while keeping collect_diamond
+  solvable and acyclic: the wood pickaxe also needs a sapling, the stone pickaxe
+  also needs coal, the furnace costs coal, and the iron pickaxe no longer needs a
+  table (only the furnace).
+make:
+  wood_pickaxe: {uses: {wood: 1, sapling: 1}}
+  stone_pickaxe: {uses: {wood: 1, stone: 1, coal: 1}}
+  iron_pickaxe: {nearby: [furnace]}
+place:
+  furnace: {uses: {stone: 1, coal: 1}}

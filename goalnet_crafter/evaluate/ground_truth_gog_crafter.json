@@ -1,0 +1,88 @@
+{
+  "_formalism": "Goal-Oriented Graph (GoG) - Leung, Wang, Shen, 'From entity-centric to goal-oriented graphs', Knowledge-Based Systems 341 (2026) 115706. Directed graph G=(V,E); each node is a goal with Name/Description/Required Tools/Required Materials/Preconditions/Postconditions (Table 1); edges encode goal->subgoal (prerequisite) relations, each with a description; graph is acyclic so DFS from a root goal yields a well-defined goal tree.",
+  "_naming_convention": "Node names follow '<action> <item>' as in the paper (e.g. 'craft wooden pickaxe', 'mine cobblestone').",
+  "_source_of_truth": "crafter/data.yaml (collect.require, place.uses, make.uses/nearby) - verified from the environment, not from a wiki.",
+  "_root_goals": {"collect_diamond": "mine diamond", "make_iron_pickaxe": "craft iron pickaxe", "collect_iron": "mine iron", "place_furnace": "place furnace", "make_stone_pickaxe": "craft stone pickaxe", "make_wood_pickaxe": "craft wooden pickaxe"},
+
+  "nodes": [
+    {"name": "collect wood",
+     "description": "Face a tree and use the Do action to obtain wood.",
+     "required_tools": [], "required_materials": [],
+     "preconditions": [], "postconditions": {"wood": 1},
+     "task_list": ["Move toward tree", "Do"]},
+
+    {"name": "place crafting table",
+     "description": "Place a crafting table on grass, sand or path, consuming wood.",
+     "required_tools": [], "required_materials": {"wood": 2},
+     "preconditions": ["collect wood"], "postconditions": {"nearby": "table"},
+     "task_list": ["Place Table"]},
+
+    {"name": "craft wooden pickaxe",
+     "description": "Craft a wooden pickaxe while standing near a crafting table.",
+     "required_tools": ["table"], "required_materials": {"wood": 1},
+     "preconditions": ["place crafting table", "collect wood"], "postconditions": {"wood_pickaxe": 1},
+     "task_list": ["Make Wood Pickaxe"]},
+
+    {"name": "mine stone",
+     "description": "Mine a stone tile; requires a wooden pickaxe in inventory.",
+     "required_tools": ["wood_pickaxe"], "required_materials": [],
+     "preconditions": ["craft wooden pickaxe"], "postconditions": {"stone": 1},
+     "task_list": ["Move toward stone", "Do"]},
+
+    {"name": "mine coal",
+     "description": "Mine a coal deposit; requires a wooden pickaxe, not a stone one.",
+     "required_tools": ["wood_pickaxe"], "required_materials": [],
+     "preconditions": ["craft wooden pickaxe"], "postconditions": {"coal": 1},
+     "task_list": ["Move toward coal", "Do"]},
+
+    {"name": "craft stone pickaxe",
+     "description": "Craft a stone pickaxe while standing near a crafting table.",
+     "required_tools": ["table"], "required_materials": {"wood": 1, "stone": 1},
+     "preconditions": ["place crafting table", "collect wood", "mine stone"], "postconditions": {"stone_pickaxe": 1},
+     "task_list": ["Make Stone Pickaxe"]},
+
+    {"name": "place furnace",
+     "description": "Place a furnace on grass, sand or path, consuming stone.",
+     "required_tools": [], "required_materials": {"stone": 4},
+     "preconditions": ["mine stone"], "postconditions": {"nearby": "furnace"},
+     "task_list": ["Place Furnace"]},
+
+    {"name": "mine iron",
+     "description": "Mine an iron deposit; requires a stone pickaxe in inventory.",
+     "required_tools": ["stone_pickaxe"], "required_materials": [],
+     "preconditions": ["craft stone pickaxe"], "postconditions": {"iron": 1},
+     "task_list": ["Move toward iron", "Do"]},
+
+    {"name": "craft iron pickaxe",
+     "description": "Craft an iron pickaxe while standing near both a crafting table and a furnace.",
+     "required_tools": ["table", "furnace"], "required_materials": {"wood": 1, "coal": 1, "iron": 1},
+     "preconditions": ["place crafting table", "place furnace", "collect wood", "mine coal", "mine iron"],
+     "postconditions": {"iron_pickaxe": 1},
+     "task_list": ["Make Iron Pickaxe"]},
+
+    {"name": "mine diamond",
+     "description": "Mine a diamond deposit; requires an iron pickaxe in inventory.",
+     "required_tools": ["iron_pickaxe"], "required_materials": [],
+     "preconditions": ["craft iron pickaxe"], "postconditions": {"diamond": 1},
+     "task_list": ["Move toward diamond", "Do"]}
+  ],
+
+  "edges": [
+    {"from": "place crafting table", "to": "collect wood", "description": "A crafting table is built from wood, so wood must be collected first."},
+    {"from": "craft wooden pickaxe", "to": "place crafting table", "description": "Crafting requires standing near a placed crafting table."},
+    {"from": "craft wooden pickaxe", "to": "collect wood", "description": "A wooden pickaxe consumes wood."},
+    {"from": "mine stone", "to": "craft wooden pickaxe", "description": "Stone cannot be mined without a wooden pickaxe."},
+    {"from": "mine coal", "to": "craft wooden pickaxe", "description": "Coal cannot be mined without a wooden pickaxe."},
+    {"from": "craft stone pickaxe", "to": "place crafting table", "description": "Crafting requires a nearby crafting table."},
+    {"from": "craft stone pickaxe", "to": "collect wood", "description": "A stone pickaxe consumes wood."},
+    {"from": "craft stone pickaxe", "to": "mine stone", "description": "A stone pickaxe consumes stone."},
+    {"from": "place furnace", "to": "mine stone", "description": "A furnace is built from stone."},
+    {"from": "mine iron", "to": "craft stone pickaxe", "description": "Iron cannot be mined without a stone pickaxe."},
+    {"from": "craft iron pickaxe", "to": "place crafting table", "description": "Iron crafting requires a nearby crafting table."},
+    {"from": "craft iron pickaxe", "to": "place furnace", "description": "Iron crafting requires a nearby furnace."},
+    {"from": "craft iron pickaxe", "to": "collect wood", "description": "An iron pickaxe consumes wood."},
+    {"from": "craft iron pickaxe", "to": "mine coal", "description": "An iron pickaxe consumes coal."},
+    {"from": "craft iron pickaxe", "to": "mine iron", "description": "An iron pickaxe consumes iron."},
+    {"from": "mine diamond", "to": "craft iron pickaxe", "description": "Diamond cannot be mined without an iron pickaxe."}
+  ]
+}
