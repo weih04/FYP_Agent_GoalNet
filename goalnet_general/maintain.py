@@ -17,7 +17,11 @@ belief never overwrites observation. An observed goal can be revised but never
 removed, and neither can the task goal, nor a goal whose failed attempts contradict
 its facts (removing it would make the contradiction vanish rather than fix it), nor
 a goal the same reply reports (a reply that corrects a goal and removes it means the
-correction).
+correction). Only repair rounds remove goals at all: an episode can show a goal wrong
+only through a failed attempt, which calls for correcting it, and a goal one episode
+does not show is not thereby wrong. A revision that recorded failures already refute
+(they had everything it lists, and changed nothing) is refused, so a correction is
+always a hypothesis the experience has not yet ruled out.
 Evidence accumulates. After each merge,
 repair also reports observed goals whose cited episodes record a different change
 (problems.evidence_problems); one still contradicted after the last repair round is
@@ -51,7 +55,7 @@ from .adapter import load as load_adapter
 from .derive import _key, provisions
 from .llm import DEFAULT_MODEL, call_model
 from .problems import (contradicted_by_failures, evidence_problems, fact_problems, failure_problems,
-                       unsupported_observed)
+                       refuting_failures, unsupported_observed)
 from .prompts import extract_delta, fingerprint, maintain_regenerate, repair_delta, retarget_delta
 from .schema import DeltaReply, FactsReply, facts_to_node, parse_delta
 from .evaluate.scoring import derive, experienced_reference, finalise, find_root, score, summary_line
@@ -95,11 +99,13 @@ def _find(nodes, incoming):
     return None, None
 
 
-def merge(graph, delta, source, contradicted=()):
+def merge(graph, delta, source, contradicted=(), refuted=None):
     """Fold a DeltaReply into `graph`. Returns (new graph with edges derived, changelog).
 
     `source` labels the changes ({"episode": n} or {"repair": r, "episode": n}).
     `contradicted` names goals whose failures contradict them; they are not removed.
+    `refuted(node)` is true when recorded failures already refute a goal's facts; a
+    revision to such facts is refused, so each correction must be a new hypothesis.
     """
     nodes = copy.deepcopy([n for n in graph.get("nodes", [])])
     log = []
@@ -130,6 +136,10 @@ def merge(graph, delta, source, contradicted=()):
                             "evidence": new_evidence})
             if incoming["basis"] == "observed":
                 existing["basis"] = "observed"
+            continue
+        if refuted is not None and refuted(incoming):
+            log.append({**source, "op": "kept", "goal": existing["name"], "proposed": _facts(incoming),
+                        "policy": "a correction its recorded failures already refute is refused"})
             continue
         before = _facts(existing)
         for f in FACT_FIELDS:
@@ -165,6 +175,12 @@ def merge(graph, delta, source, contradicted=()):
             # An observed goal happened; its facts can be corrected, but it cannot be undone.
             log.append({**source, "op": "kept", "goal": existing["name"], "reason": r.reason,
                         "policy": "observed goals are revised, never removed"})
+            continue
+        if "repair" not in source:
+            # An episode can show a goal wrong only by a failure, which calls for a correction;
+            # not appearing in one episode is no evidence. Repair still removes what checks flag.
+            log.append({**source, "op": "kept", "goal": existing["name"], "reason": r.reason,
+                        "policy": "only repair removes goals; an episode corrects them"})
             continue
         nodes.remove(existing)
         log.append({**source, "op": "remove", "goal": existing["name"], "reason": r.reason,
@@ -240,7 +256,8 @@ class Maintainer:
         if self.strategy == "merge":
             raw = self._call(extract_delta(self.task_text, self.graph, episode, self.names, env=self.env), DeltaReply,
                              f"raw_e{n}.txt")
-            graph, log = merge(self.graph, parse_delta(raw), source, self._contradicted(self.graph))
+            graph, log = merge(self.graph, parse_delta(raw), source, self._contradicted(self.graph),
+                               self._refuted)
         else:
             raw = self._call(maintain_regenerate(self.task_text, self.graph, episode, self.names, env=self.env), FactsReply,
                              f"raw_e{n}.txt")
@@ -256,15 +273,19 @@ class Maintainer:
         for r in range(1, self.max_repairs + 1):
             problems = fact_problems(graph, self.env, knowledge_base=True) + \
                 evidence_problems(graph, self.episodes, self.adapter.evidence_records) + \
-                failure_problems(graph, self.episodes, self.adapter.failure_records)
+                failure_problems(graph, self.episodes, self.adapter.failure_records, self.adapter.evidence_records)
             if not problems:
                 break
             raw = self._call(repair_delta(self.task_text, graph, problems, self.names, env=self.env), DeltaReply,
                              f"raw_{tag}_repair{r}.txt")
-            graph, rlog = merge(graph, parse_delta(raw), {"episode": n, "repair": r}, self._contradicted(graph))
+            graph, rlog = merge(graph, parse_delta(raw), {"episode": n, "repair": r}, self._contradicted(graph),
+                                self._refuted)
             log = log + rlog
         graph, log = self._downgrade_unsupported(graph, log, n)
         return graph, log + self._contested(graph, n)
+
+    def _refuted(self, node):
+        return bool(refuting_failures(node, self.episodes, self.adapter.failure_records))
 
     def _contradicted(self, graph):
         return {name for name, _ in contradicted_by_failures(graph, self.episodes, self.adapter.failure_records)}
@@ -295,7 +316,7 @@ class Maintainer:
         tag = f"retarget_{task_text.replace(' ', '_')}"
         raw = self._call(retarget_delta(task_text, self.graph, self.names, env=self.env), DeltaReply, f"raw_{tag}.txt")
         source = {"episode": episodes_so_far, "retarget": task_text}
-        graph, log = merge(self.graph, parse_delta(raw), source, self._contradicted(self.graph))
+        graph, log = merge(self.graph, parse_delta(raw), source, self._contradicted(self.graph), self._refuted)
         graph, log = self._repair(graph, log, episodes_so_far, tag)
         self.graph = graph
         self.changelog += log

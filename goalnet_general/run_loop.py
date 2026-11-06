@@ -24,8 +24,13 @@ not usable, the last usable graph for that task is kept (with a warning); if the
 is none, the iteration acts without a graph. --actor-model sets the acting model
 separately from the constructing one (--model).
 
---seed S gives iteration i the base seed S + 1000*i; without it every iteration
-draws a random seed, which the adapter records (BALROG: seed.json in the run).
+--maps fresh (default) gives iteration i the base seed S + 1000*i, so every iteration
+plays new maps; --maps fixed replays the same maps (base seed S) every iteration, so
+a change between iterations comes from the graph, not from easier or harder maps, and
+the agent meets the situations it failed in again. Without --seed, fresh draws a
+random seed per iteration and fixed draws one base seed for the whole run; the
+adapter records each (BALROG: seed.json in the run). Test the final graph on maps
+the loop never played.
 --env-option key=value passes environment settings to the adapter (Crafter:
 action_hints=false, survival_rules=true, max_steps=5, or any BALROG Hydra override).
 
@@ -37,6 +42,7 @@ achievements and scores, rewritten after every iteration), changelog.json.
 import argparse
 import json
 import os
+import random
 import sys
 
 from .adapter import load as load_adapter
@@ -103,7 +109,9 @@ def main(argv=None):
     p.add_argument("--base-url")
     p.add_argument("--api-key-env", default="OPENAI_API_KEY")
     p.add_argument("--max-repairs", type=int, default=2)
-    p.add_argument("--seed", type=int, help="base seed; iteration i uses seed + 1000*i (default: random)")
+    p.add_argument("--seed", type=int, help="base seed (default: random)")
+    p.add_argument("--maps", choices=["fresh", "fixed"], default="fresh",
+                   help="fresh: new maps each iteration (seed + 1000*i); fixed: the same maps every iteration")
     p.add_argument("--env-option", nargs="*", help="environment settings as key=value, passed to the adapter")
     args = p.parse_args(argv)
 
@@ -113,6 +121,8 @@ def main(argv=None):
     out = os.path.abspath(args.out)
     for sub in ("episodes", "graphs", "acting", "maintain"):
         os.makedirs(os.path.join(out, sub), exist_ok=True)
+    if args.maps == "fixed" and args.seed is None:
+        args.seed = random.randrange(1, 2 ** 31)
     final_task = args.tasks[-1]
     final_ref, final_root = adapter.reference(final_task, args.variant)
     variant_id = adapter.variant_id(args.variant)
@@ -131,8 +141,9 @@ def main(argv=None):
               "episodes_per_iteration": args.episodes, "init": args.init, "strategy": args.strategy,
               "variant": args.variant, "variant_id": variant_id, "vocab": args.vocab, "model": args.model,
               "actor_model": args.actor_model, "env_options": options, "prompt_fingerprint": fingerprint(),
+              "maps": args.maps, "seed": args.seed,
               "label": (f"{args.env}/loop/{args.strategy}/init-{args.init if args.init in ('empty', 'zero') else 'file'}"
-                        f"/{'+'.join(args.tasks)}/vocab-{args.vocab}/variant-{variant_id}{opts}"),
+                        f"/{'+'.join(args.tasks)}/vocab-{args.vocab}/variant-{variant_id}/maps-{args.maps}{opts}"),
               "rounds": []}
     versions, experience, metas, paths = [m.graph], [], [], []
     last_usable = {}
@@ -170,7 +181,7 @@ def main(argv=None):
                     json.dump(last_usable[task], f, indent=2)
             print(f"[{task} iteration {i + 1}] acting with {'graph' if acting else 'no graph (none usable)'}",
                   flush=True)
-            seed = None if args.seed is None else args.seed + 1000 * it
+            seed = None if args.seed is None else args.seed + (0 if args.maps == "fixed" else 1000 * it)
             run_dir = adapter.run_episodes(task, acting, os.path.join(out, "episodes"), args.episodes, seed,
                                            args.actor_model, args.variant, options)
 

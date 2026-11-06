@@ -184,7 +184,9 @@ class CrafterAdapter(Adapter):
         which a goal's facts do not describe, so a failed Place counts only when the
         agent has placed something on that kind of tile before: then the tile was
         not the reason."""
-        actions = {a for a in node.get("task_list") or [] if a.startswith(("Make ", "Place "))}
+        # Case-insensitive: a draft's "make wood pickaxe" still names the action it attempts.
+        actions = {" ".join(a.lower().split()) for a in node.get("task_list") or []}
+        actions = {a for a in actions if a.startswith(("make ", "place "))}
         if not actions:
             return []
         placeable = {it.get("facing") for e in episodes.values() for it in e.get("interactions", [])
@@ -194,7 +196,7 @@ class CrafterAdapter(Adapter):
         for n, e in sorted(episodes.items()):
             for it in e.get("interactions", []):
                 action, times = it.get("action", ""), it.get("results", {}).get("no change", 0)
-                if action not in actions or not times or not isinstance(it.get("holding"), (dict, list)):
+                if action.lower() not in actions or not times or not isinstance(it.get("holding"), (dict, list)):
                     continue
                 if action.startswith("Place ") and it.get("facing") not in placeable:
                     continue

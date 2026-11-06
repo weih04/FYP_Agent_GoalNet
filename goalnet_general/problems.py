@@ -14,6 +14,9 @@ from .evaluate.metrics.validity import validate
 
 # Per-category cap on problems sent back, so one runaway category cannot flood the prompt.
 MAX_PROBLEMS_PER_CATEGORY = 10
+# Attempt tables in failure problems: holdings listed per goal, and things shown per holding.
+MAX_ATTEMPT_GROUPS = 6
+MAX_PRESENT_SHOWN = 4
 
 
 def edge_problems(graph, root_name, task_text, env):
@@ -140,34 +143,75 @@ def _available(node, rec):
             and all(held.get(m, 0) >= q for m, q in (node.get("required_materials") or {}).items()))
 
 
-def contradicted_by_failures(graph, episodes, failures):
+def refuting_failures(node, episodes, failures):
+    """The recorded failures of `node`'s action in which everything it lists was available."""
+    return [r for r in failures(episodes, node) if _available(node, r)]
+
+
+def _range(values):
+    lo, hi = min(values), max(values)
+    return f"{lo}" if lo == hi else f"{lo}-{hi}"
+
+
+def _attempts(node, episodes, failures, records):
+    """Every recorded attempt at the goal's action, grouped by what was held, so the
+    model can contrast the states that failed with the ones that worked."""
+    groups = {}
+    for r in failures(episodes, node):
+        key = tuple(sorted(k for k, v in r["held"].items() if v > 0))
+        g = groups.setdefault(key, {"times": 0, "counts": {}, "present": {}})
+        g["times"] += r["times"]
+        for k in key:
+            g["counts"].setdefault(k, []).append(r["held"][k])
+        for t in set(r["present"]):
+            g["present"][t] = g["present"].get(t, 0) + r["times"]
+    lines = []
+    for key, g in sorted(groups.items(), key=lambda kv: -kv[1]["times"])[:MAX_ATTEMPT_GROUPS]:
+        held = ", ".join(f"{k} {_range(g['counts'][k])}" for k in key) or "nothing"
+        near = sorted(g["present"].items(), key=lambda kv: (-kv[1], kv[0]))[:MAX_PRESENT_SHOWN]
+        around = f"; present: {', '.join(f'{t} in {n}' for t, n in near)}" if near else ""
+        lines.append(f"failed {g['times']} time(s) holding {held}{around}")
+    if len(groups) > MAX_ATTEMPT_GROUPS:
+        lines.append(f"failed in {len(groups) - MAX_ATTEMPT_GROUPS} other holdings")
+    if records is not None:
+        done = [rec for e in episodes.values() for rec in records(e, node)]
+        if done:
+            rec = done[-1]
+            lines.append(f"succeeded {len(done)} time(s), e.g. recording {_change(rec)}, holding "
+                         f"{', '.join(rec['held']) or 'nothing'}"
+                         + (f", with {', '.join(rec['present'])} present" if rec["present"] else ""))
+        else:
+            lines.append("never succeeded")
+    return "; ".join(lines)
+
+
+def contradicted_by_failures(graph, episodes, failures, records=None):
     """Goals, prior or observed, whose action changed nothing although everything they
     list was available, as (goal name, message). This is how experience challenges a
     belief: a recipe that is wrong fails while it looks satisfied. `failures(episodes,
-    node)` is the adapter's failure_records; it keeps only failures that are evidence."""
+    node)` is the adapter's failure_records; it keeps only failures that are evidence.
+    With `records` (the adapter's evidence_records) the successes are listed too."""
     out = []
     for node in graph.get("nodes", []):
-        found = [r for r in failures(episodes, node) if _available(node, r)]
+        found = refuting_failures(node, episodes, failures)
         if not found:
             continue
-        rec = found[-1]
         total = sum(r["times"] for r in found)
-        where = ", ".join(sorted({f"episode {r['episode']}" for r in found}, key=lambda w: int(w.split()[1])))
-        context = (f" with {', '.join(rec['present'])} present" if rec["present"] else "") + \
-                  f", holding {_items(rec['held'])}"
         mats = node.get("required_materials") or {}
         most = {m: max(r["held"].get(m, 0) for r in found) for m in mats}
         more = (f" It failed even holding {_items(most)}, so listing more of a material only helps above "
                 f"those amounts." if mats else "")
         out.append((node["name"], f"{node['name']!r} lists {_requirements(node)}, but its action changed nothing "
-                                  f"{total} time(s) while all of that was available ({where}; e.g. episode "
-                                  f"{rec['episode']} step {rec['step']}, {rec['action']}{context}).{more} So it "
-                                  f"needs something it does not list. The attempts show the goal is wanted: "
-                                  f"correct its requirements rather than removing it, and mark anything the "
-                                  f"experience does not show as prior."))
+                                  f"{total} time(s) while all of that was available.{more} Every recorded "
+                                  f"attempt: {_attempts(node, episodes, failures, records)}. So it needs "
+                                  f"something it does not list: compare what was held and present when it "
+                                  f"failed and when it worked. A correction that one of these failed attempts "
+                                  f"already had everything for is refused. The attempts show the goal is "
+                                  f"wanted: correct its requirements rather than removing it, and mark "
+                                  f"anything the experience does not show as prior."))
     return out
 
 
-def failure_problems(graph, episodes, failures):
+def failure_problems(graph, episodes, failures, records=None):
     """Maintenance: the messages of contradicted_by_failures, capped like the others."""
-    return [msg for _, msg in contradicted_by_failures(graph, episodes, failures)][:MAX_PROBLEMS_PER_CATEGORY]
+    return [msg for _, msg in contradicted_by_failures(graph, episodes, failures, records)][:MAX_PROBLEMS_PER_CATEGORY]
