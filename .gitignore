@@ -1,3 +1,6 @@
 goalnet_results
 __pycache__/
 tests/
+# BALROG: API keys and run outputs stay local
+BALROG/SECRETS
+BALROG/results/
